@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเช็คอินจุดตรวจ รปภ.</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--g:#06C755;--sub:#666}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Kanit',sans-serif}
+body{background:#f0f2f5;color:#222;display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:420px;background:#fff;min-height:100vh;display:flex;flex-direction:column;position:relative}
+.header{background:var(--g);color:#fff;padding:24px 20px;text-align:center;border-radius:0 0 20px 20px}
+.header h1{font-size:20px;font-weight:500}
+.header p{font-size:13px;opacity:.9}
+.content{padding:20px;flex:1;display:flex;flex-direction:column;gap:16px}
+.card{background:#f8f9fa;border:1px solid #e9ecef;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.title{font-size:13px;color:var(--sub)}
+.profile{display:flex;align-items:center;gap:12px}
+.profile img{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid var(--g);background:#dee2e6}
+.profile h3{font-size:16px;font-weight:500}
+.profile p{font-size:12px;color:var(--sub);word-break:break-word}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:4px 0;border-bottom:1px dashed #dee2e6}
+.row:last-child{border-bottom:none}
+.row .l{color:var(--sub);white-space:nowrap}
+.row .v{font-weight:500;text-align:right}
+select{width:100%;padding:12px;border:1px solid #ced4da;border-radius:10px;font-size:14px;background:#fff}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:500;cursor:pointer}
+.primary{background:var(--g);color:#fff}
+.primary:disabled{background:#b0b0b0;cursor:not-allowed}
+.sec{background:#e9ecef;color:#333;font-size:14px;padding:10px}
+.err{background:#fff3f3;border:1px solid #f5c2c7;color:#b02a37;border-radius:12px;padding:12px;font-size:13px;word-break:break-word}
+.ov{position:absolute;inset:0;background:rgba(255,255,255,.9);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;z-index:99}
+.sp{width:40px;height:40px;border:4px solid #f3f3f3;border-top-color:var(--g);border-radius:50%;animation:s .8s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="ov" class="ov"><div class="sp"></div><p id="ovt" style="font-size:14px;color:#666">กำลังโหลดระบบ...</p></div>
+
+  <div class="header"><h1>ระบบเช็คอินจุดตรวจ</h1><p>ศาลจังหวัดกันทรลักษ์</p></div>
+
+  <div class="content">
+    <div id="err" class="err hidden"></div>
+
+    <div class="card">
+      <div class="title">ผู้ปฏิบัติงาน</div>
+      <div class="profile">
+        <img id="pic" alt="">
+        <div><h3 id="uname">กำลังโหลดชื่อ...</h3><p id="ustat">กำลังเชื่อมต่อ LINE...</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">รายละเอียดจุดตรวจ</div>
+      <div id="fixed" class="row hidden"><span class="l">จุดตรวจ (จาก QR):</span><span id="fixedname" class="v" style="color:#06C755"></span></div>
+      <div id="selbox">
+        <select id="sel">
+          <option value="">-- กรุณาเลือกจุดตรวจ --</option>
+          <option>ห้องโถงประชาสัมพันธ์</option>
+          <option>ประตูทางเข้าฝั่งโรงอาหาร</option>
+          <option>ประตูทางเข้าฝั่งห้องตำรวจศาล</option>
+          <option>ห้องควบคุมหญิง</option>
+          <option>ห้องปล่อยชั่วคราว</option>
+          <option>ห้องพิจารณาคดี 7</option>
+          <option>ประตูฝั่งอัยการ</option>
+          <option>ที่จอดรถเรือนจำ</option>
+          <option>ห้องพิจารณาคดี 1</option>
+          <option>ห้องประชุมไกล่เกลี่ย</option>
+          <option>ทางเข้าห้องพักผู้พิพากษา</option>
+          <option>ศาลาพักประชาชน</option>
+          <option>หน้าบ้านพักหัวหน้าศาล</option>
+          <option>ใต้แฟลตเจ้าหน้าที่</option>
+          <option>หลังบ้านท.ถาวร</option>
+        </select>
+      </div>
+      <div class="row"><span class="l">เวลาปัจจุบัน:</span><span id="clock" class="v">-</span></div>
+      <div class="row"><span class="l">พิกัด GPS:</span><span id="gps" class="v" style="color:#e67e22">กำลังดึงพิกัด...</span></div>
+    </div>
+
+    <button id="retry" class="btn sec hidden" onclick="location.reload()">🔄 ลองใหม่</button>
+    <button id="go" class="btn primary" onclick="submitCheckIn()" disabled>🚀 บันทึกและส่งเช็คอิน</button>
+  </div>
+</div>
+
+<script>
+const LIFF_ID = "2012239888-sZYeQY2w";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyGKfQ-_MUPtGFRUPzRAYKkLpGKAN8afPtsDOJguvR1Eu-glxB-i1fTcdE2ZALF_EKD/exec";
+
+let profile = null, idToken = null, lat = null, lng = null, busy = false, POINT = "";
+const $ = id => document.getElementById(id);
+
+function loading(on, t){ $('ovt').innerText = t || "กำลังโหลด..."; $('ov').classList.toggle('hidden', !on); }
+function showErr(m){ $('err').innerText = m; $('err').classList.remove('hidden'); $('retry').classList.remove('hidden'); }
+
+function getPoint(){
+  const p = new URLSearchParams(location.search);
+  let v = p.get('point');
+  if (!v) {
+    const st = p.get('liff.state');
+    if (st) { try { v = new URLSearchParams(st.replace(/^\/?\?/, '')).get('point'); } catch(e){} }
+  }
+  return (v || "").trim();
+}
+
+function setupPoint(){
+  POINT = getPoint();
+  if (POINT) {
+    $('fixed').classList.remove('hidden');
+    $('selbox').classList.add('hidden');
+    $('fixedname').innerText = POINT;
+  }
+}
+
+window.onload = function(){
+  const tick = () => $('clock').innerText = new Date().toLocaleTimeString('th-TH') + " น.";
+  tick(); setInterval(tick, 1000);
+  setupPoint();
+  initLiff();
+};
+
+function initLiff(){
+  loading(true, "กำลังเชื่อมต่อระบบ LINE...");
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("เชื่อมต่อ LINE เกินเวลา")), 10000));
+
+  Promise.race([liff.init({ liffId: LIFF_ID }), timeout])
+    .then(() => {
+      if (!liff.isLoggedIn()) { liff.login(); return new Promise(() => {}); }
+      setupPoint();
+      return liff.getProfile();
+    })
+    .then(p => {
+      profile = p;
+      idToken = liff.getIDToken();
+      $('uname').innerText = p.displayName;
+      $('ustat').innerText = "ยืนยันตัวตนสำเร็จ";
+      if (p.pictureUrl) $('pic').src = p.pictureUrl;
+      getLocation();
+    })
+    .catch(e => {
+      loading(false);
+      $('uname').innerText = "เชื่อมต่อ LINE ไม่สำเร็จ";
+      $('ustat').innerText = "ไม่สามารถยืนยันตัวตนได้";
+      showErr("รายละเอียด: " + (e && e.message ? e.message : String(e)));
+    });
+}
+
+function getLocation(){
+  let done = false;
+  const finish = (ok, txt) => {
+    if (done) return; done = true;
+    $('gps').innerText = txt;
+    $('gps').style.color = ok ? "#06C755" : "#e74c3c";
+    loading(false);
+    $('go').disabled = false;
+  };
+  loading(true, "กำลังดึงพิกัด GPS...");
+  setTimeout(() => finish(false, "ไม่มีพิกัด"), 6000);
+  if (!navigator.geolocation) return finish(false, "อุปกรณ์ไม่รองรับ GPS");
+  navigator.geolocation.getCurrentPosition(
+    pos => { lat = pos.coords.latitude; lng = pos.coords.longitude; finish(true, lat.toFixed(5) + ", " + lng.toFixed(5)); },
+    () => finish(false, "ดึงพิกัดไม่ได้"),
+    { enableHighAccuracy: true, timeout: 5500, maximumAge: 0 }
+  );
+}
+
+function submitCheckIn(){
+  if (busy) return;
+  const point = POINT || $('sel').value;
+  if (!point) { alert("กรุณาเลือกจุดตรวจก่อนครับ"); return; }
+  if (!profile) { alert("ยังไม่ได้ยืนยันตัวตนกับ LINE กรุณาเปิดใหม่"); return; }
+
+  busy = true; $('go').disabled = true;
+  loading(true, "กำลังบันทึกข้อมูล...");
+
+  fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ idToken: idToken, officerName: profile.displayName, checkPoint: point, lat: lat, lng: lng })
+  })
+  .then(r => r.json())
+  .then(res => {
+    loading(false);
+    if (res && res.status === "success") {
+      sendFlex(res.officerName || profile.displayName, point);
+    } else {
+      busy = false; $('go').disabled = false;
+      alert("❌ เกิดข้อผิดพลาด: " + (res && res.message ? res.message : "ไม่ทราบสาเหตุ"));
+    }
+  })
+  .catch(err => {
+    loading(false); busy = false; $('go').disabled = false;
+    alert("❌ เชื่อมต่อเซิร์ฟเวอร์ล้มเหลว: " + (err && err.message ? err.message : err));
+  });
+}
+
+function sendFlex(officer, point){
+  const has = (typeof lat === "number" && typeof lng === "number");
+  const coord = has ? lat.toFixed(5) + ", " + lng.toFixed(5) : "ไม่มีพิกัด";
+  const now = new Date().toLocaleString('th-TH');
+  const row = (k, v, bold) => ({ type:"box", layout:"baseline", contents:[
+    { type:"text", text:k, color:"#aaaaaa", size:"sm", flex:2 },
+    { type:"text", text:v, color:"#333333", size:"sm", flex:5, wrap:true, weight: bold ? "bold" : "regular" } ]});
+
+  const bubble = {
+    type:"bubble",
+    header:{ type:"box", layout:"vertical", backgroundColor:"#06C755", paddingAll:"15px", contents:[
+      { type:"text", text:"🛡️ รายงานผลการตรวจจุด", weight:"bold", color:"#ffffff", size:"md" },
+      { type:"text", text:"ศาลจังหวัดกันทรลักษ์", color:"#ffffffcc", size:"xs", margin:"sm" } ]},
+    body:{ type:"box", layout:"vertical", contents:[
+      { type:"text", text:point, weight:"bold", size:"lg", color:"#222222", wrap:true },
+      { type:"box", layout:"vertical", margin:"lg", spacing:"sm", contents:[
+        row("เจ้าหน้าที่", officer, true), row("เวลา", now), row("พิกัด", coord) ]} ]}
+  };
+  if (has) {
+    bubble.footer = { type:"box", layout:"vertical", contents:[
+      { type:"button", style:"link", height:"sm",
+        action:{ type:"uri", label:"📍 เปิดดูพิกัดใน Google Maps", uri:"https://maps.google.com/?q=" + lat + "," + lng } } ]};
+  }
+  const msg = { type:"flex", altText:"[รายงานการตรวจ] " + point + " โดย " + officer, contents:bubble };
+
+  if (liff.isApiAvailable('shareTargetPicker')) {
+    liff.shareTargetPicker([msg])
+      .then(() => { alert("✅ บันทึกและส่งรายงานสำเร็จ"); liff.closeWindow(); })
+      .catch(() => { alert("✅ บันทึกสำเร็จ แต่ยังไม่ได้ส่งเข้าแชท"); liff.closeWindow(); });
+  } else {
+    alert("✅ บันทึกสำเร็จ (อุปกรณ์นี้ไม่รองรับการส่งเข้าแชท)");
+    liff.closeWindow();
+  }
+}
+</script>
+</body>
+</html>
