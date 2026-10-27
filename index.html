@@ -25,7 +25,14 @@ body{background:#f0f2f5;color:#222;display:flex;justify-content:center;min-heigh
 .row:last-child{border-bottom:none}
 .row .l{color:var(--sub);white-space:nowrap}
 .row .v{font-weight:500;text-align:right}
-select{width:100%;padding:12px;border:1px solid #ced4da;border-radius:10px;font-size:14px;background:#fff}
+select,textarea{width:100%;padding:12px;border:1px solid #ced4da;border-radius:10px;font-size:14px;background:#fff}
+textarea{resize:none;height:80px}
+.seg{display:flex;gap:10px}
+.seg label{flex:1;text-align:center;padding:12px 6px;border:2px solid #ced4da;border-radius:12px;font-size:15px;font-weight:500;cursor:pointer;background:#fff}
+.seg input{display:none}
+.seg input:checked + span.ok{color:#06C755}
+.seg label.sel-ok{border-color:#06C755;background:#e8f9ef;color:#06A74A}
+.seg label.sel-bad{border-color:#e03131;background:#fff0f0;color:#c92a2a}
 .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:500;cursor:pointer}
 .primary{background:var(--g);color:#fff}
 .primary:disabled{background:#b0b0b0;cursor:not-allowed}
@@ -81,6 +88,18 @@ select{width:100%;padding:12px;border:1px solid #ced4da;border-radius:10px;font-
       <div class="row"><span class="l">พิกัด GPS:</span><span id="gps" class="v" style="color:#e67e22">กำลังดึงพิกัด...</span></div>
     </div>
 
+    <div class="card">
+      <div class="title">ผลการตรวจ</div>
+      <div class="seg">
+        <label id="lbl-ok" class="sel-ok"><input type="radio" name="st" value="ปกติ" checked>✅ ปกติ</label>
+        <label id="lbl-bad"><input type="radio" name="st" value="ผิดปกติ">⚠️ ผิดปกติ</label>
+      </div>
+      <div>
+        <div class="title" id="notelbl" style="margin-bottom:6px">หมายเหตุ (ไม่บังคับ)</div>
+        <textarea id="note" maxlength="200" placeholder="เช่น ประตูไม่ได้ล็อก"></textarea>
+      </div>
+    </div>
+
     <button id="retry" class="btn sec hidden" onclick="location.reload()">🔄 ลองใหม่</button>
     <button id="go" class="btn primary" onclick="submitCheckIn()" disabled>🚀 บันทึกและส่งเช็คอิน</button>
   </div>
@@ -95,6 +114,14 @@ const $ = id => document.getElementById(id);
 
 function loading(on, t){ $('ovt').innerText = t || "กำลังโหลด..."; $('ov').classList.toggle('hidden', !on); }
 function showErr(m){ $('err').innerText = m; $('err').classList.remove('hidden'); $('retry').classList.remove('hidden'); }
+function getStatus(){ return document.querySelector('input[name="st"]:checked').value; }
+
+function updateStatusUI(){
+  const bad = getStatus() === "ผิดปกติ";
+  $('lbl-ok').className = bad ? "" : "sel-ok";
+  $('lbl-bad').className = bad ? "sel-bad" : "";
+  $('notelbl').innerText = bad ? "หมายเหตุ (จำเป็นต้องกรอก)" : "หมายเหตุ (ไม่บังคับ)";
+}
 
 function getPoint(){
   const p = new URLSearchParams(location.search);
@@ -118,6 +145,8 @@ function setupPoint(){
 window.onload = function(){
   const tick = () => $('clock').innerText = new Date().toLocaleTimeString('th-TH') + " น.";
   tick(); setInterval(tick, 1000);
+  document.querySelectorAll('input[name="st"]').forEach(r => r.addEventListener('change', updateStatusUI));
+  updateStatusUI();
   setupPoint();
   initLiff();
 };
@@ -173,19 +202,23 @@ function submitCheckIn(){
   if (!point) { alert("กรุณาเลือกจุดตรวจก่อนครับ"); return; }
   if (!profile) { alert("ยังไม่ได้ยืนยันตัวตนกับ LINE กรุณาเปิดใหม่"); return; }
 
+  const status = getStatus();
+  const note = $('note').value.trim();
+  if (status === "ผิดปกติ" && !note) { alert("กรุณากรอกหมายเหตุว่าพบอะไรผิดปกติ"); $('note').focus(); return; }
+
   busy = true; $('go').disabled = true;
   loading(true, "กำลังบันทึกข้อมูล...");
 
   fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ idToken: idToken, officerName: profile.displayName, checkPoint: point, lat: lat, lng: lng })
+    body: JSON.stringify({ idToken: idToken, officerName: profile.displayName, checkPoint: point, lat: lat, lng: lng, status: status, note: note })
   })
   .then(r => r.json())
   .then(res => {
     loading(false);
     if (res && res.status === "success") {
-      sendFlex(res.officerName || profile.displayName, point);
+      sendFlex(res.officerName || profile.displayName, point, status, note);
     } else {
       busy = false; $('go').disabled = false;
       alert("❌ เกิดข้อผิดพลาด: " + (res && res.message ? res.message : "ไม่ทราบสาเหตุ"));
@@ -197,30 +230,40 @@ function submitCheckIn(){
   });
 }
 
-function sendFlex(officer, point){
+function sendFlex(officer, point, status, note){
+  const bad = status === "ผิดปกติ";
   const has = (typeof lat === "number" && typeof lng === "number");
   const coord = has ? lat.toFixed(5) + ", " + lng.toFixed(5) : "ไม่มีพิกัด";
   const now = new Date().toLocaleString('th-TH');
-  const row = (k, v, bold) => ({ type:"box", layout:"baseline", contents:[
+  const color = bad ? "#E03131" : "#06C755";
+
+  const row = (k, v, bold, vcolor) => ({ type:"box", layout:"baseline", contents:[
     { type:"text", text:k, color:"#aaaaaa", size:"sm", flex:2 },
-    { type:"text", text:v, color:"#333333", size:"sm", flex:5, wrap:true, weight: bold ? "bold" : "regular" } ]});
+    { type:"text", text:v, color: vcolor || "#333333", size:"sm", flex:5, wrap:true, weight: bold ? "bold" : "regular" } ]});
+
+  const rows = [
+    row("ผลการตรวจ", bad ? "⚠️ พบสิ่งผิดปกติ" : "✅ ปกติ", true, bad ? "#E03131" : "#06A74A"),
+    row("เจ้าหน้าที่", officer, true),
+    row("เวลา", now),
+    row("พิกัด", coord)
+  ];
+  if (note) rows.splice(1, 0, row("หมายเหตุ", note, bad, bad ? "#C92A2A" : "#333333"));
 
   const bubble = {
     type:"bubble",
-    header:{ type:"box", layout:"vertical", backgroundColor:"#06C755", paddingAll:"15px", contents:[
-      { type:"text", text:"🛡️ รายงานผลการตรวจจุด", weight:"bold", color:"#ffffff", size:"md" },
+    header:{ type:"box", layout:"vertical", backgroundColor:color, paddingAll:"15px", contents:[
+      { type:"text", text: bad ? "🚨 รายงานพบสิ่งผิดปกติ" : "🛡️ รายงานผลการตรวจจุด", weight:"bold", color:"#ffffff", size:"md" },
       { type:"text", text:"ศาลจังหวัดกันทรลักษ์", color:"#ffffffcc", size:"xs", margin:"sm" } ]},
     body:{ type:"box", layout:"vertical", contents:[
       { type:"text", text:point, weight:"bold", size:"lg", color:"#222222", wrap:true },
-      { type:"box", layout:"vertical", margin:"lg", spacing:"sm", contents:[
-        row("เจ้าหน้าที่", officer, true), row("เวลา", now), row("พิกัด", coord) ]} ]}
+      { type:"box", layout:"vertical", margin:"lg", spacing:"sm", contents: rows } ]}
   };
   if (has) {
     bubble.footer = { type:"box", layout:"vertical", contents:[
       { type:"button", style:"link", height:"sm",
         action:{ type:"uri", label:"📍 เปิดดูพิกัดใน Google Maps", uri:"https://maps.google.com/?q=" + lat + "," + lng } } ]};
   }
-  const msg = { type:"flex", altText:"[รายงานการตรวจ] " + point + " โดย " + officer, contents:bubble };
+  const msg = { type:"flex", altText:(bad ? "[พบสิ่งผิดปกติ] " : "[รายงานการตรวจ] ") + point + " โดย " + officer, contents:bubble };
 
   if (liff.isApiAvailable('shareTargetPicker')) {
     liff.shareTargetPicker([msg])
